@@ -47,7 +47,7 @@ Bot Telegram untuk memantau harga token di jaringan blockchain tertentu mengguna
       alert_sent INTEGER DEFAULT 0
   );
   ```
-5. **Buat file konfigurasi **``**:**
+5. **Buat file konfigurasi **.env**:**
    ```
    BOT_TOKEN=your_telegram_bot_token
    ```
