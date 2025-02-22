@@ -234,5 +234,5 @@ bot.on("callback_query", async (ctx) => {
 bot.launch();
 console.log("[INFO] Bot Telegram berjalan!");
 
-// Jalankan pemantauan harga setiap 10 detik
-setInterval(checkPrices, 10000);
+// Jalankan pemantauan harga setiap 30 detik
+setInterval(checkPrices, 30000);
