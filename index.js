@@ -1,6 +1,7 @@
 const axios = require("axios");
 const sqlite3 = require("sqlite3").verbose();
 const { Telegraf } = require("telegraf");
+const HttpsProxyAgent = require("https-proxy-agent");
 require("dotenv").config();
 
 // Load API key dari .env
@@ -8,6 +9,23 @@ const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const bot = new Telegraf(TELEGRAM_TOKEN);
 const API_URL = "https://www.okx.com/priapi/v5/dex/token/market/history-dex-token-hlc-candles";
 const API_URL_BTC = "https://www.okx.com/priapi/v5/market/candles?instId=BTC-USDT&bar=1s&limit=1";
+const proxyUrl = process.env.PROXY_URL;
+const agent = new HttpsProxyAgent(proxyUrl);
+
+
+async function hitExternalApi(apiUrl, params = {}) {
+    try {
+        const response = await axios.get(apiUrl, {
+            params,
+            httpsAgent: agent, 
+        });
+
+        return response;
+    } catch (error) {
+        console.error("❌ Gagal mengambil data:", error.message);
+        return null;
+    }
+}
 
 // Koneksi ke SQLite
 const db = new sqlite3.Database("tokens.db", (err) => {
@@ -47,10 +65,13 @@ async function checkPrices() {
 
                 if (token.token_name === "BTC") {
                     console.log(`[INFO] BTC | Harga: ${token.target_price}`);
-                    response = await axios.get(API_URL_BTC);
+                    response = await hitExternalApi(API_URL_BTC);
                 } else {
-                    response = await axios.get(API_URL, {
-                        params: { chainId: token.chain_id, address: token.address, bar: "1s", limit: "1" },
+                    response = await hitExternalApi(API_URL, {
+                        chainId: token.chain_id,
+                        address: token.address,
+                        bar: "1s",
+                        limit: "1",
                     });
                 }
 
@@ -99,10 +120,13 @@ async function checkUserTokenPrices(chatID, ctx) {
                 let response; // Deklarasikan response di luar if-else
 
                 if (token.token_name === "BTC") {
-                    response = await axios.get(API_URL_BTC);
+                    response = await hitExternalApi(API_URL_BTC);
                 } else {
-                    response = await axios.get(API_URL, {
-                        params: { chainId: token.chain_id, address: token.address, bar: "1s", limit: "1" },
+                    response = await hitExternalApi(API_URL, {
+                        chainId: token.chain_id,
+                        address: token.address,
+                        bar: "1s",
+                        limit: "1",
                     });
                 }
 
@@ -114,7 +138,7 @@ async function checkUserTokenPrices(chatID, ctx) {
 
                     message += `\n🔹 *${token.token_name}*\n   💰 Harga Sekarang: ${currentPrice}\n   🎯 Target: ${token.target_price}\n   🔗 Chain ID: ${token.chain_id}\n`;
                 } else {
-                    console.error(`[ERROR] Gagal mengambil harga ${token.token_name}:`, response.data);
+                    console.error(`[ERROR1] Gagal mengambil harga ${token.token_name}:`, response.data);
                     message += `\n⚠️ *${token.token_name}* (Chain ID: ${token.chain_id}) tidak ditemukan!\n`;
                 }
             } catch (error) {
@@ -210,5 +234,5 @@ bot.on("callback_query", async (ctx) => {
 bot.launch();
 console.log("[INFO] Bot Telegram berjalan!");
 
-// Jalankan pemantauan harga setiap 10 detik
-setInterval(checkPrices, 10000);
+// Jalankan pemantauan harga setiap 30 detik
+setInterval(checkPrices, 30000);
