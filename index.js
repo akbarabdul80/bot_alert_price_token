@@ -34,13 +34,13 @@ const db = new sqlite3.Database("tokens.db", (err) => {
 });
 
 // Fungsi untuk menambahkan token ke database
-function addToken(chatID, chainId, tokenName, address, targetPrice, ctx) {
+function addToken(chatID, chainId, tokenName, address, targetPriceGte, targetPriceLte, ctx) {
     db.run(
-        "INSERT INTO tokens (chat_id, chain_id, token_name, address, target_price) VALUES (?, ?, ?, ?, ?)",
-        [chatID, chainId, tokenName, address, targetPrice],
+        "INSERT INTO tokens (chat_id, chain_id, token_name, address, target_price_gte, target_price_lte) VALUES (?, ?, ?, ?, ?, ?)",
+        [chatID, chainId, tokenName, address, targetPriceGte, targetPriceLte],
         (err) => {
             if (err) ctx.reply("❌ Gagal menambahkan token ke dalam daftar.");
-            else ctx.reply(`✅ Token *${tokenName}* (${address}) di Chain ID *${chainId}* dengan target harga *${targetPrice}* telah ditambahkan!`, { parse_mode: "Markdown" });
+            else ctx.reply(`✅ Token *${tokenName}* (${address}) di Chain ID *${chainId}* dengan target harga >= *${targetPriceGte}* dan <= *${targetPriceLte}* telah ditambahkan!`, { parse_mode: "Markdown" });
         }
     );
 }
@@ -64,7 +64,7 @@ async function checkPrices() {
                 let response; // Deklarasikan response di luar if-else
 
                 if (token.token_name === "BTC") {
-                    console.log(`[INFO] BTC | Harga: ${token.target_price}`);
+                    console.log(`[INFO] BTC | Harga: ${token.target_price_gte}`);
                     response = await hitExternalApi(API_URL_BTC);
                 } else {
                     response = await hitExternalApi(API_URL, {
@@ -79,12 +79,12 @@ async function checkPrices() {
                     const latestCandle = response.data.data[0];
                     const currentPrice = parseFloat(latestCandle[4]); // Harga penutupan (close)
 
-                    console.log(`[INFO] ${token.token_name} | Chain ID: ${token.chain_id} | Harga: ${currentPrice} | Target: ${token.target_price}`);
+                    console.log(`[INFO] ${token.token_name} | Chain ID: ${token.chain_id} | Harga: ${currentPrice} | Target >=: ${token.target_price_gte} | Target <=: ${token.target_price_lte}`);
 
-                    if (currentPrice >= token.target_price && token.alert_sent === 0) {
+                    if ((currentPrice >= token.target_price_gte || currentPrice <= token.target_price_lte) && token.alert_sent === 0) {
                         bot.telegram.sendMessage(
                             token.chat_id,
-                            `🚨 *Harga Tercapai!*\n\n🔹 *${token.token_name}*\n💰 *Harga Sekarang:* ${currentPrice}\n🎯 *Target:* ${token.target_price}\n🔗 *Chain ID:* ${token.chain_id}`,
+                            `🚨 *Harga Tercapai!*\n\n🔹 *${token.token_name}*\n💰 *Harga Sekarang:* ${currentPrice}\n🎯 *Target >=:* ${token.target_price_gte}\n🎯 *Target <=:* ${token.target_price_lte}\n🔗 *Chain ID:* ${token.chain_id}`,
                             {
                                 parse_mode: "Markdown",
                                 reply_markup: {
@@ -134,9 +134,9 @@ async function checkUserTokenPrices(chatID, ctx) {
                     const latestCandle = response.data.data[0];
                     const currentPrice = parseFloat(latestCandle[4]); // Harga penutupan (close)
 
-                    console.log(`[INFO] ${token.token_name} | Chain ID: ${token.chain_id} | Harga: ${currentPrice} | Target: ${token.target_price}`);
+                    console.log(`[INFO] ${token.token_name} | Chain ID: ${token.chain_id} | Harga: ${currentPrice} | Target >=: ${token.target_price_gte} | Target <=: ${token.target_price_lte}`);
 
-                    message += `\n🔹 *${token.token_name}*\n   💰 Harga Sekarang: ${currentPrice}\n   🎯 Target: ${token.target_price}\n   🔗 Chain ID: ${token.chain_id}\n`;
+                    message += `\n🔹 *${token.token_name}*\n   💰 Harga Sekarang: ${currentPrice}\n   🎯 Target >=: ${token.target_price_gte}\n   🎯 Target <=: ${token.target_price_lte}\n   🔗 Chain ID: ${token.chain_id}\n`;
                 } else {
                     console.error(`[ERROR1] Gagal mengambil harga ${token.token_name}:`, response.data);
                     message += `\n⚠️ *${token.token_name}* (Chain ID: ${token.chain_id}) tidak ditemukan!\n`;
@@ -154,18 +154,19 @@ async function checkUserTokenPrices(chatID, ctx) {
 // 🛠️ Perintah untuk menambahkan token
 bot.command("add_token", (ctx) => {
     const args = ctx.message.text.split(" ");
-    if (args.length < 5) {
-        return ctx.reply("⚠️ *Format Salah!*\nGunakan format:\n`/addtoken [ChainID] [Nama Token] [Address] [Target Harga]`", { parse_mode: "Markdown" });
+    if (args.length < 6) {
+        return ctx.reply("⚠️ *Format Salah!*\nGunakan format:\n`/addtoken [ChainID] [Nama Token] [Address] [Target Harga >=] [Target Harga <=]`", { parse_mode: "Markdown" });
     }
 
     const chainId = args[1];
     const tokenName = args[2];
     const address = args[3];
-    const targetPrice = parseFloat(args[4]);
+    const targetPriceGte = parseFloat(args[4]);
+    const targetPriceLte = parseFloat(args[5]);
 
-    if (isNaN(targetPrice)) return ctx.reply("❌ Target harga harus berupa angka!");
+    if (isNaN(targetPriceGte) || isNaN(targetPriceLte)) return ctx.reply("❌ Target harga harus berupa angka!");
 
-    addToken(ctx.message.chat.id, chainId, tokenName, address, targetPrice, ctx);
+    addToken(ctx.message.chat.id, chainId, tokenName, address, targetPriceGte, targetPriceLte, ctx);
 });
 
 // 🛠️ Perintah untuk melihat daftar token user
@@ -178,7 +179,7 @@ bot.command("list_token", (ctx) => {
 
         let message = "📌 *Token yang Anda Pantau:*\n";
         tokens.forEach((token, index) => {
-            message += `\n${index + 1}. *${token.token_name}* - ${token.address}\n   🆔 Token ID: ${token.id}\n   🔗 Chain ID: ${token.chain_id}\n   🎯 Target: ${token.target_price}\n   ✅ Capai Target: ${token.alert_sent === 1 ? 'Sudah' : 'Belum'}\n`;
+            message += `\n${index + 1}. *${token.token_name}* - ${token.address}\n   🆔 Token ID: ${token.id}\n   🔗 Chain ID: ${token.chain_id}\n   🎯 Target >=: ${token.target_price_gte}\n   🎯 Target <=: ${token.target_price_lte}\n   ✅ Capai Target: ${token.alert_sent === 1 ? 'Sudah' : 'Belum'}\n`;
         });
 
         ctx.reply(message, { parse_mode: "Markdown" });
@@ -206,16 +207,17 @@ bot.command("price_now", (ctx) => {
 
 bot.command("edit_target", (ctx) => {
     const args = ctx.message.text.split(" ");
-    if (args.length !== 3) return ctx.reply("⚠️ Format salah! Gunakan: \n/edit_target [token_id] [target_baru]");
+    if (args.length !== 4) return ctx.reply("⚠️ Format salah! Gunakan: \n/edit_target [token_id] [target_baru_gte] [target_baru_lte]");
 
     const tokenId = args[1];
-    const newTarget = parseFloat(args[2]);
+    const newTargetGte = parseFloat(args[2]);
+    const newTargetLte = parseFloat(args[3]);
 
-    if (isNaN(newTarget)) return ctx.reply("⚠️ Target harga harus berupa angka.");
+    if (isNaN(newTargetGte) || isNaN(newTargetLte)) return ctx.reply("⚠️ Target harga harus berupa angka.");
 
-    db.run("UPDATE tokens SET target_price = ?, alert_sent = 0 WHERE id = ?", [newTarget, tokenId], (err) => {
+    db.run("UPDATE tokens SET target_price_gte = ?, target_price_lte = ?, alert_sent = 0 WHERE id = ?", [newTargetGte, newTargetLte, tokenId], (err) => {
         if (err) return ctx.reply("❌ Gagal memperbarui target harga.");
-        ctx.reply(`✅ Target harga berhasil diperbarui menjadi *${newTarget}* untuk Token ID: ${tokenId}`, { parse_mode: "Markdown" });
+        ctx.reply(`✅ Target harga berhasil diperbarui menjadi >= *${newTargetGte}* dan <= *${newTargetLte}* untuk Token ID: ${tokenId}`, { parse_mode: "Markdown" });
     });
 });
 
@@ -225,7 +227,7 @@ bot.on("callback_query", async (ctx) => {
     if (callbackData.startsWith("edit_")) {
         const tokenId = callbackData.split("_")[1];
 
-        ctx.reply(`✏️ Kirim target harga baru dalam format: \n/edit_target ${tokenId} [harga_baru]`);
+        ctx.reply(`✏️ Kirim target harga baru dalam format: \n/edit_target ${tokenId} [harga_baru_gte] [harga_baru_lte]`);
     }
 });
 
