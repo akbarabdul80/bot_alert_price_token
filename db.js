@@ -5,7 +5,8 @@ db.run(`
         chain_id INTEGER,
         address TEXT,
         token_name TEXT,
-        target_price REAL,
+        target_price_gte REAL,
+        target_price_lte REAL,
         alert_sent INTEGER DEFAULT 0
     )
 `);

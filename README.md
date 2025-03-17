@@ -43,7 +43,8 @@ Bot Telegram untuk memantau harga token di jaringan blockchain tertentu mengguna
       chain_id INTEGER,
       address TEXT,
       token_name TEXT,
-      target_price REAL,
+      target_price_gte REAL,
+      target_price_lte REAL,
       alert_sent INTEGER DEFAULT 0
   );
   ```
@@ -65,13 +66,13 @@ Bot Telegram untuk memantau harga token di jaringan blockchain tertentu mengguna
 ### **Tambahkan Token ke Pemantauan**
 
 ```bash
-/addtoken <chain_id> <token_address> <token_name> <target_price>
+/addtoken <chain_id> <token_address> <token_name> <target_price_gte> <target_price_lte>
 ```
 
 *Contoh:*
 
 ```bash
-/addtoken 8453 0x276449c108dfc6932923740905ca8990a39c7e8f HLC 0.000051
+/addtoken 8453 0x276449c108dfc6932923740905ca8990a39c7e8f HLC 0.000051 0.000045
 ```
 
 ### **Lihat Daftar Token yang Dipantau**
@@ -85,13 +86,13 @@ Bot Telegram untuk memantau harga token di jaringan blockchain tertentu mengguna
 ### **Edit Target Harga Token**
 
 ```bash
-/edittarget <token_address> <new_target_price>
+/edittarget <token_id> <new_target_price_gte> <new_target_price_lte>
 ```
 
 *Contoh:*
 
 ```bash
-/edittarget 0x276449c108dfc6932923740905ca8990a39c7e8f 0.000055
+/edittarget 1 0.000055 0.000040
 ```
 
 ## 🏗 Struktur Database (SQLite)
@@ -106,7 +107,8 @@ CREATE TABLE tokens (
     chain_id TEXT,
     address TEXT,
     token_name TEXT,
-    target_price REAL,
+    target_price_gte REAL,
+    target_price_lte REAL,
     alert_sent BOOLEAN DEFAULT 0
 );
 ```
